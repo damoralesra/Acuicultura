@@ -1,0 +1,215 @@
+---
+title: "Peces Especies"
+output:
+  html_document:
+    toc: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, fig.align = "center")
+```
+## Leyendo Base de Datos.
+
+```{r}
+datos <- read.csv(file = "DatosEspecies.csv", encoding = "UTF-8")
+```
+Esta base de datos contiene algunas medidas productivas de diferentes especies acuícolas en los municipios del departamento de Risaralda, para los años **2014** y **2015**. Entre las medidas se encuentra el número de animales sembrados y cosechados, el peso promedio, la producción total y precio al productor.
+La base de datos puede ser descargada en el link https://drive.google.com/open?id=1cWSfqW4jnf0tZHy1HQ4cXr-IvmzTce-w
+
+Esta fue creada a partir de las bases de datos proporcionadas por la Gobernación de Risaralda para los años 2014 y 2015, las cuales fueron consultadas y descargadas en Octubre de 2017, en los siguientes links:
+
+**Año 2014** https://www.datos.gov.co/Agricultura-y-Desarrollo-Rural/Estadistica-2014-Acuicultura-por-Especies/6fmg-kn6d
+
+**Año 2015** https://www.datos.gov.co/Agricultura-y-Desarrollo-Rural/Estadistica-2015-Acuicultura-por-Especies/msan-h2wb
+
+### Resumen y Estructura de Datos.
+
+```{r}
+summary(datos)
+str(datos)
+```
+Para este caso necesitamos que la variable **Año** sea tenido en cuenta como un factor y no como un entero.
+
+### Cargando paquetes a ser usados. 
+```{r message=FALSE}
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(ggthemes)
+library(DT)
+library(pander)
+```
+
+Cambiamos la clase de la variable Año, de entero a factor, eliminamos la columna X y además se divide la producción entre 1000, con el fin de expresar esta en toneladas.
+```{r}
+datos1 <- datos %>%
+        select(-X) %>%
+        mutate(Año = factor(Año),
+               Producción = Producción/1000)
+
+str(datos1)
+```
+
+## Exploración de Datos.
+### Distribución producción, siembra y cosecha 2014 - 2015.
+```{r}
+ggplot(data = datos1, aes(x = Producción)) +
+        geom_histogram(aes(y = ..density..), bins = 100, color = "white", fill = "gray20") +
+        geom_density(alpha = 0.07, size = 0.8, fill = "red", colour = "red") +
+        labs(x = "Producción en Toneladas",
+             y = "Densidad",
+             title = "Distribución de la Producción") +
+        theme_light() +
+        theme(plot.title = element_text(hjust = 0.5, size = 17),
+              axis.title.x = element_text(size = 13),
+              axis.title.y = element_text(size = 13))
+
+ggplot(data = datos1, aes(x = Animales.Sembrados)) +
+        geom_histogram(aes(y = ..density..), bins = 100, color = "Blue", fill = "gray20") +
+        geom_density(alpha = 0.07, size = 0.8, fill = "red", colour = "red") +
+        labs(x = "Animales Sembrados",
+             y = "Densidad",
+             title = "Distribución Animales Sembrados") +
+        theme_light() +
+        theme(plot.title = element_text(hjust = 0.5, size = 17),
+              axis.title.x = element_text(size = 13),
+              axis.title.y = element_text(size = 13))
+
+ggplot(data = datos1, aes(x = Animales.Cosechados)) +
+        geom_histogram(aes(y = ..density..), bins = 100, color = "Pink", fill = "gray20") +
+        geom_density(alpha = 0.07, size = 0.8, fill = "red", colour = "red") +
+        labs(x = "Animales Cosechados",
+             y = "Densidad",
+             title = "Distribución Animales Cosechados") +
+        theme_light() +
+        theme(plot.title = element_text(hjust = 0.5, size = 17),
+              axis.title.x = element_text(size = 13),
+              axis.title.y = element_text(size = 13))
+```
+
+Pasamos de formato ancho a formato largo, con el fin de facilitar algunas gráficas y mediciones.
+```{r}
+datos2 <- datos1 %>%
+        gather(key = Variable,
+               value = Valor,
+               -c(1:3))
+```
+
+### Resumen General.
+```{r}
+datos22 <- datos2 %>%
+        group_by(Variable, Especie, Año) %>%
+        summarise(Minimo = min(Valor),
+                  Maximo = max(Valor),
+                  Promedio = round(mean(Valor), digits = 2),
+                  Desviacion = round(sd(Valor), digits = 2))
+
+datatable(datos22)
+```
+
+### Resumen por Municipio.
+```{r}
+datos23 <- datos2 %>%
+        group_by(Municipio, Variable, Año) %>%
+        summarise(Minimo = min(Valor),
+                  Maximo = max(Valor),
+                  Promedio = round(mean(Valor), digits = 2),
+                  Desviacion = round(sd(Valor), digits = 2))
+
+datatable(datos23)
+```
+
+
+### Animales Cosechados.
+```{r}
+cosechados <- datos2 %>%
+        group_by(Especie, Año) %>%
+        filter(Variable == "Animales.Cosechados") %>%
+        summarise(Total = sum(Valor)) %>%
+        arrange(Total)
+
+pander(cosechados, justify = "right")
+
+ggplot(data = cosechados, aes(x = Especie, y = Total, group = Año)) +
+        geom_bar(aes(fill=Año), position = "dodge", stat = "identity", color = "Red") +
+        labs(x = "Especie Cosechada",
+             y = "Número de Animales Cosechados") +
+        scale_fill_manual(values = c("gray15", "gray30")) +
+        geom_text(aes(label = Total),
+                  position = position_dodge(width = 1), vjust = -0.2,
+                  color = "Black", size = 2.5) +
+        theme_light() +
+        theme(axis.title.x = element_text(size = 12),
+              axis.title.y = element_text(size = 12),
+              axis.text.x = element_text(angle = 90, size = 5.5, color = "Black"))
+```
+
+### Porcentaje de Cosecha.
+```{r}
+porcentajes <- datos2 %>%
+        group_by(Especie, Año, Variable) %>%
+        summarise(Total = sum(Valor)) %>%
+        filter(Variable %in% c("Animales.Cosechados", "Animales.Sembrados"))
+
+porcentajes2 <- porcentajes %>%
+        spread(key = Variable,
+               value = Total)
+
+porcentajes2.1 <- porcentajes2 %>%
+        mutate(Porcentaje = round(Animales.Cosechados/Animales.Sembrados * 100, digits = 2))
+
+panderOptions("table.split.table", 100)
+pander(porcentajes2.1, justify = c("right"))
+
+ggplot(data = porcentajes2.1, aes(x = Especie, y = Porcentaje, group = Año)) +
+        geom_bar(aes(fill = Año), position = "dodge", stat = "identity", color = "green3") +
+        labs(x = "Especie Cultivada",
+             y = "Porcentaje de Extracción o Cosecha") +
+        scale_fill_grey() +
+        theme_light() +
+        theme(axis.text.x = element_text(color = "Black", angle = 90, size = 6))
+```
+
+### Especie más producida.
+```{r}
+especie <- datos2 %>%
+        group_by(Especie, Año) %>%
+        filter(Variable == "Producción") %>%
+        summarise(Total = sum(Valor))
+
+pander(especie)
+
+ggplot(data = especie, aes(x = Especie, y = Total, group = Año)) + 
+        geom_bar(aes(fill = Año), position = "dodge", stat = "identity", color = "orange") +
+        labs(x = "Especie",
+             y = "Producción Total en Toneladas") + 
+        scale_fill_manual(values = c("gray28", "gray68")) +
+        theme_light() +
+        theme(axis.text.x = element_text(color = "gray10", angle = 90, size = 6))
+```
+
+### Municipio más productor.
+```{r}
+municipio <- datos2 %>%
+        group_by(Municipio, Año) %>%
+        filter(Variable == "Producción") %>%
+        summarise(Total = sum(Valor)) %>%
+        arrange(-Total)
+
+datatable(municipio)
+
+municipio2 <- municipio[1:10, ]
+
+ggplot(data = municipio2, aes(x = Municipio, y = Total, group = Año)) +
+        geom_bar(aes(fill = Año), position = "dodge", stat = "identity",
+                       color = "mediumorchid2") +
+        labs(x = "Municipio",
+             y = "Producción Total en Toneladas",
+             title = "Municipios más productores en los años 2014 - 2015") +
+        geom_text(aes(label = round(Total, 0)),
+                  position = position_dodge(width = 1), vjust = -0.2) +
+        scale_fill_grey() +
+        theme_light() +
+        theme(plot.title = element_text(hjust = 0.5))
+```
+

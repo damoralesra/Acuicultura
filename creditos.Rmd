@@ -1,0 +1,269 @@
+---
+title: "Créditos Acuicultura."
+output:
+  html_document:
+    toc: true
+---
+
+```{r setup, include=FALSE, fig.align='center'}
+knitr::opts_chunk$set(echo = TRUE, fig.align = "center")
+```
+## Leyendo Base de Datos.
+
+```{r}
+datos <- read.csv(file = "Cadena_Productiva_Acuicultura_-_Cr_ditos.csv", encoding = "UTF-8")
+```
+
+Esta base de datos contiene la información de los créditos solicitados para la cade productiva Acuicola en Colombia, entre Enero de 2004 hasta Junio de 2017. Entre la información disponible se puede encontrar el departamento, municipio, tipo de productor, entre otras mas.
+La base de datos fue consultada en Octubre de 2017, y se encuentra disponible en el siguiente link:
+https://www.datos.gov.co/Agricultura-y-Desarrollo-Rural/Cadena-Productiva-Acuicultura-Cr-ditos/6ssc-wybc
+
+Se eliminan las columnas que no serán utilizadas.
+```{r}
+datos1 <- datos[ ,-c(8,9,10,18)]
+
+summary(datos1)
+str(datos1)
+```
+
+Paquetes utilizados.
+```{r message=FALSE}
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(ggthemes)
+library(DT)
+library(pander)
+```
+
+Se transforman las variables o columnas **Año (Anio)** y **mes** a Factor.
+```{r}
+datos1 <- datos1 %>%
+        mutate(Anio = factor(Anio),
+               Mes = factor(Mes))
+
+summary(datos1[ ,c(1,2)])
+str(datos1[ ,c(1,2)])
+```
+
+## Valor Créditos.
+### Cantidad y Valor de los Créditos año a año.
+```{r}
+n_cred <- datos1 %>%
+        group_by(Anio) %>%
+        count() %>%
+        ungroup()
+
+n_cred2 <- datos1 %>%
+        group_by(Anio) %>%
+        summarise(Total = sum(valor)) %>%
+        ungroup() %>%
+        select(-Anio)
+
+total <- cbind(n_cred, n_cred2)
+
+names(total) <- c("Año", "N", "Total")
+
+datatable(total, class = "cell-border stripe") %>%
+        formatStyle(columns = c(1,2), "text-align" = "right") %>%
+        formatCurrency(columns = 3, currency = "$", interval = 3,
+                       mark = ".", digits = 0)
+
+ggplot(data = total, aes(x = as.factor(Año), y = Total)) +
+        geom_bar(stat = "identity", color = "darkred") +
+        scale_fill_manual(values = "green32") +
+        coord_flip() +
+        labs(x = "Año", y = "Valor Total Créditos") +
+        theme_linedraw()
+```
+**Nota:** Los valores del año **2017** corresponden unicamente al periodo Enero - Junio.
+
+### Cantidad y Valor Créditos mes a mes.
+```{r}
+cred_mes <- datos1 %>%
+        group_by(Mes) %>%
+        count() %>%
+        ungroup()
+
+cred_mes2 <- datos1 %>%
+        group_by(Mes) %>%
+        summarise(Total = sum(valor)) %>%
+        ungroup() %>%
+        select(-Mes)
+
+total2 <- cbind(cred_mes, cred_mes2)
+
+datatable(total2, class = "cell-border stripe") %>%
+        formatStyle(columns = c(1,2), "text-align" = "right") %>%
+        formatCurrency(columns = 3, currency = "$", interval = 3,
+                       mark = ".", digits = 0)
+
+ggplot(data = total2, aes(x = as.factor(Mes), y = Total)) +
+        geom_bar(stat = "identity", color = "Orange") +
+        scale_fill_manual(values = "green42") +
+        coord_flip() +
+        labs(x = "Mes", y = "Valor Total Créditos") +
+        theme_linedraw()
+```
+
+### Fuente de Colocación y Tipo de Operación.
+```{r}
+colocacion <- datos1 %>%
+        group_by(FuenteColocacion, TipoOperacion) %>%
+        count() %>%
+        ungroup()
+
+colocacion2 <- datos1 %>%
+        group_by(FuenteColocacion, TipoOperacion) %>%
+        summarise(Total = sum(valor)) %>%
+        ungroup() %>%
+        select(-c(FuenteColocacion, TipoOperacion))
+
+colocacionfinal <- cbind(colocacion, colocacion2)
+
+datatable(colocacionfinal) %>%
+        formatCurrency(columns = 4, currency = "$", interval = 3,
+                       mark = ".", digits = 0)
+```
+El tipo de colocación hace referencia a la clasificación dada por **FINAGRO** (Fondo para el Financiamiento del Sector Agropecuario) para los créditos del sector agropecuario, se definen como:
+
+**Redescuento:** Recursos que FINAGRO presta a intermediarios financieros.
+
+**Sustituta:** Recursos propios de los intermediarios financieros que sustituyen la inversión de FINAGRO.
+
+**Agropecuaria:** Recursos propios también de los intermediarios pero que no sustituyen inversión.
+
+Mas información: 
+http://repository.cesa.edu.co/bitstream/handle/10726/1580/MFC_00508.pdf?sequence=1
+
+https://www.finagro.com.co/
+
+### Intermediarios que entregan los créditos.
+```{r}
+interm <- datos1 %>%
+        group_by(Intermediario) %>%
+        count() %>%
+        mutate(Total = 18544,
+               Porcentaje = n/Total * 100) %>%
+        arrange(-Porcentaje)
+
+datatable(interm) %>%
+        formatCurrency(columns = 4, currency = "%", digits = 3, before = FALSE)
+```
+
+## Tipo de Productor que solicita el crédito.
+### Por género.
+```{r}
+productor <- datos1 %>%
+        group_by(Genero) %>%
+        count()
+
+pander(productor)
+```
+
+### Por tipo de productor.
+```{r}
+productor2 <- datos1 %>%
+        group_by(TipoProductor) %>%
+        count()
+
+pander(productor2)
+```
+
+### Tipo de productor y Género.
+```{r}
+tp_gen <- datos1 %>%
+        group_by(Genero, TipoProductor) %>%
+        count()
+
+pander(tp_gen)
+```
+
+### Valor Créditos solitidos por Pequeños y Medianos Productores.
+```{r}
+valor_c <- datos1 %>%
+        filter(TipoProductor %in% c("Pequeños Productores",
+                                    "Medianos Productores")) %>%
+        group_by(Genero, TipoProductor) %>%
+        summarise(Total = sum(valor))
+
+names(valor_c) <- c("Género", "Tipo de Productor", "Total en $")
+
+panderOptions("decimal.mark", ",")
+panderOptions("big.mark", ".")
+panderOptions("digits", 15)
+pander(valor_c[1:4, ], style = "rmarkdown") 
+```
+
+### Valor Créditos Año a Año de pequeños productores (Hombres y Mujeres).
+```{r}
+PP_cred <- datos1 %>%
+        filter(TipoProductor == "Pequeños Productores" & Genero != "Sociedad") %>%
+        group_by(Genero, Anio) %>%
+        summarise(Total = sum(valor))
+
+ggplot(data = PP_cred, aes(x = as.factor(Anio), y = Total, group = Genero)) +
+        geom_bar(aes(fill = Genero), stat = "identity", position = "dodge", color = "lightblue") +
+        labs(x = "Año", y = "Total en $",
+             title = "Créditos Pequeños Productores, Hombres y Mujeres.",
+             fill = "Género") +
+        scale_fill_grey() +
+        theme_linedraw()
+```
+
+### En que se invierte el crédito??
+```{r}
+producto <- datos1 %>%
+        group_by(Producto) %>%
+        count() %>%
+        mutate(Total = 18544,
+               Porcentaje = n/Total * 100) %>%
+        arrange(-Porcentaje)
+
+panderOptions("round", 3)
+pander(producto, style = "rmarkdown")
+```
+
+## Información Créditos por Departamento.
+### Cantidad y Valor de los créditos.
+```{r}
+departamento <- datos1 %>%
+        group_by(Departamento) %>%
+        count() %>%
+        ungroup()
+
+departamento2 <- datos1 %>%
+        group_by(Departamento) %>%
+        summarise(Total = sum(valor)) %>%
+        ungroup() %>%
+        select(-1)
+
+dep_final <- cbind(departamento, departamento2)
+
+datatable(dep_final) %>%
+        formatCurrency(columns = 3, currency = "$", interval = 3, mark = ".", digits = 0)
+```
+
+### Porcentaje Hombres y Mujeres que solicitaron Créditos en cada Departamento.
+```{r fig.width=10}
+porcentaje <- datos1 %>%
+        filter(Genero != "Sociedad") %>%
+        group_by(Departamento, Genero) %>%
+        count() %>%
+        ungroup()
+
+porcentaje2 <- porcentaje %>%
+        group_by(Departamento) %>%
+        mutate(Total = sum(n),
+               Porcentaje = round(n/Total *100, digits = 2))
+
+datatable(porcentaje2)
+
+ggplot(data = porcentaje2, aes(x = Departamento, y = Porcentaje, fill = Genero)) +
+        geom_bar(stat = "identity", color = "darkgreen") +
+        labs(x = "Departamento", y = "Porcentaje", fill = "Género") +
+        theme_linedraw() +
+        scale_fill_grey() +
+        coord_flip()
+```
+
