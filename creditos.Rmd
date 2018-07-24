@@ -3,6 +3,7 @@ title: "Créditos Acuicultura."
 output:
   html_document:
     toc: true
+    theme: readable
 ---
 
 ```{r setup, include=FALSE, fig.align='center'}
